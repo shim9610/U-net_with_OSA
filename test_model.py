@@ -20,12 +20,15 @@ def custom_MSE(output, target,epsilon=1e-10,max_value=1e10):
     return loss
 
 # 모델 로드
-model = torch.load('logUnet_best_model_100kresi_BC.pth', map_location=torch.device('cpu'))
+model = SpectrumModel()
 model.eval()
+weights = torch.load('logUnet_best_model_3333k_liquid512_n_weights_only.pth',
+                     map_location=torch.device('cpu'))
+model.load_state_dict(weights)
 
 
 data = []
-input, sol =  create_spectrum(solution_type='dual')
+input, sol,_ =  create_spectrum(solution_type='dual')
 data.append((torch.tensor(input), torch.tensor(sol)))
 dataset = SpectrumDataset(data)
 dataset=DataLoader(dataset, batch_size=32, shuffle=True)
@@ -50,11 +53,10 @@ plt.clf()
 plt.rcParams.update({'font.size': 34})
 
 plt.plot(X2, predicted_result[:,0,:].squeeze().numpy(), label='Predicted emission')
-plt.plot(X2, sol[:,0,:].squeeze().numpy(), label='Real emission')
-plt.plot(X, ori.squeeze().numpy(), label='Input Data')
+plt.plot(X2, sol[:,0,:].squeeze().numpy(), label='Simulated emission')
+plt.plot(X, ori.squeeze().numpy(), label='Simulated Input Data')
 plt.plot(X2, predicted_result[:,1,:].squeeze().numpy(), label='Predicted absorption')
-plt.plot(X2, sol[:,1,:].squeeze().numpy(), label='Real Absorption')
-plt.plot(X2, ori.squeeze().numpy()/predicted_result[:,1,:].squeeze().numpy(), label='absorption cal')
+plt.plot(X2, sol[:,1,:].squeeze().numpy(), label='Simulated Absorption')
 plt.legend(fontsize=15)
 plt.show()
 

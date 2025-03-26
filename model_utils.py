@@ -244,7 +244,7 @@ class SpectrumModel(nn.Module):
             return x
         elif mode == 'test_dual':
             # 두 채널 모두 반환
-            x[:, 0, :]= (x[:, 0, :] * factor[:, :, 1]) + factor[:, :, 0]
+            x[:, 0, :]= (x[:, 0, :] * factor[:, :, 1].unsqueeze(1)) + factor[:, :, 0].unsqueeze(1)
             return x
         elif mode == 'test':
             # 첫 번째 채널에 대해 후처리 후 반환

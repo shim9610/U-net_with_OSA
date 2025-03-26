@@ -264,16 +264,16 @@ def smothNerr(inputdata, index=range(0,100), length=101,
     
 # 예시 사용법
 # 모델 로드
-#model = SpectrumModel()
-#model.eval()
-#weights = torch.load('logUnet_best_model_3333k_liquid512_n_weights_only.pth',
-#                     map_location=torch.device('cpu'))
-#model.load_state_dict(weights)
-big_model = torch.load('logUnet_best_model_3333k_liquid512_n.pth',
-                       map_location=torch.device('cpu'),weights_only=False )
-model_weights = big_model.state_dict()
-torch.save(model_weights, 'logUnet_best_model_3333k_liquid512_n_weights_only.pth')
-print("가중치만 추출 완료! 용량이 훨씬 작아진 .pth 파일 생성됨.")
+model = SpectrumModel()
+model.eval()
+weights = torch.load('logUnet_best_model_3333k_liquid512_n_weights_only.pth',
+                     map_location=torch.device('cpu'))
+model.load_state_dict(weights)
+#big_model = torch.load('logUnet_best_model_3333k_liquid512_n.pth',
+#                       map_location=torch.device('cpu'),weights_only=False )
+#model_weights = big_model.state_dict()
+#torch.save(model_weights, 'logUnet_best_model_3333k_liquid512_n_weights_only.pth')
+
 
 
 folder_path = './data'

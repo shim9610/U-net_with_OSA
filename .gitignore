@@ -173,3 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 logUnet_best_model_3333k_liquid512_n.pth
+logUnet_best_model_3333k_liquid512_n_weights_only.pth
