@@ -2,7 +2,7 @@
 
 This repository contains the implementation and data accompanying the research described in our paper, available as a preprint at [SSRN](https://ssrn.com/abstract=5128894).
 
-The U-Net architecture combined with Optical Spectrum Analysis (OSA) techniques is applied for spectroscopic analysis, specifically focusing on accurately simulating and analyzing isotopic abundance from spectroscopic data.
+The U-Net architecture combined with Optical Spectrum Analysis (OSA) techniques is applied for spectroscopic analysis, specifically focusing on accurately simulating and analyzing isotopic abundance from spectroscopic data. In cases where strong self-reversal effects occur, the center wavelength was determined from the absorption profile.
 
 ## Project Structure
 
