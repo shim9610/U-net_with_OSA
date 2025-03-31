@@ -201,15 +201,13 @@ def get_area(Xdata,inputdata,length=100,mode="wavelength"):
     stdmax=np.std(maxV)
     return [area, meanV, stdV,maxV,meanmaxV,stdmax]
 
-def linear_filtter_DC(inputdata,size=100,rangeX=[187,549],bkp=0.05):#paper 255,455  [120,610], [432,591]
+def linear_filtter_DC(inputdata,filename,size=100,rangeX=[187,549],bkp=0.05):
     inputdata=inputdata[rangeX[0]:rangeX[1],:]
     outputdata=np.zeros([np.size(inputdata,0),size+1])
     Xdata = inputdata[:, 0]
     outputdata[:,0]=Xdata
     for i in range(size):
-        
-        Ydata = inputdata[:, i+400]
-        # 1차 다항식 피팅을 통한 백그라운드 추정
+        Ydata = inputdata[:, i+1]
         coeffs = np.polyfit(Xdata, Ydata, 1)   # coeffs[0]*x + coeffs[1]
         linear_bg = np.polyval(coeffs, Xdata)
         input_data = Ydata - linear_bg
@@ -226,20 +224,14 @@ def smothNerr(inputdata, index=range(0,100), length=101,
     
     
     for j, i in enumerate(index):
-        # X축과 Y축 데이터 추출
         Xdata = inputdata[:, 0]
         Ydata = inputdata[:, i+1]
-        
-        # 1차 다항식 피팅을 통한 백그라운드 추정
-        
-        # DC 오프셋 제거 (음수값 제거)
+        # DC offset remove
         input_data = Ydata
         
-        # Savitzky-Golay 필터를 통한 스무딩
+        # Savitzky-Golay filtter
         #input_data = signal.savgol_filter(input_data, smoothing_window, poly_order)
-        
-        
-        # 보간 및 적분
+
         x_interp = np.linspace(668.0, 672.6, 30000)
         y_interp = np.interp(x_interp, Xdata, input_data)
         y_interp = np.clip(y_interp, a_min=0, a_max=None)
@@ -250,7 +242,6 @@ def smothNerr(inputdata, index=range(0,100), length=101,
         plt.show()
         plt.pause(0.2) 
         '''
-        # 면적과 최대값 계산
         c=299792458
         x_inte=c/x_interp
         maxV[j] = np.max(input_data)
@@ -279,7 +270,7 @@ model.load_state_dict(weights)
 folder_path = './data'
 double_array, string_array = get_double_and_string_arrays_from_asc_files(folder_path)
 print(double_array)
-indexrange=range(0,12)
+indexrange=range(0,11)
 Tcoefficients=[]
 TstdV=[]
 TmeanV=[]
@@ -298,15 +289,16 @@ TfstdA=[]
 Tfmean=[]
 Tfstd=[]
 Tffiltered_data=[]
+Tcoefficients_dip=[]
+Tfiltered_data_dip=[]
+TmeanV_dip=[]
+TstdV_dip=[]
+isotope_ratios=[]
 for i in indexrange:
     name.append(double_array[i])
+    isotope_ratios.append(0.95*(float(double_array[i]))+0.01*(100-float(double_array[i])))
     numpy_array = load_asc_file_to_numpy(folder_path, string_array[i])
-    numpy_array=linear_filtter_DC(numpy_array).copy()
-    # Calculate the indices closest to the mean
-    #selected_indices, mapped_indices = map_spectra_to_average_range(numpy_array, num_to_select=100)
-    # Extract only the selected spectra based on the mapped indices
-    #replace=numpy_array.copy()
-    #numpy_array[:,300:400] = replace[:, (selected_indices).tolist()]
+    numpy_array=linear_filtter_DC(numpy_array,f"{str(string_array[i])}.asc").copy()
     Oarea, OmeanV, OstdV,OmaxV,OmeanmaxV,Ostdmax=smothNerr(numpy_array)
     Xdata=get_X_data(numpy_array)
     print(string_array[i])
@@ -325,15 +317,21 @@ for i in indexrange:
     farea, fAmeanV, fAstdV,fAmaxV,fAmeanmaxV,fAstdmax=get_area(Xdata,predicted_resultD,mode="frequency")
     #print(inputdata.shape)
     coefficients=get_fitvlaue(Xdata,predicted_result)
+    coefficients_dip=get_fitvlaue(Xdata,predicted_resultD)
     Tcoefficients.append(coefficients)
-    meanV, stdV, filtered_data = exclude_outliers_percentile_mean_std(coefficients[:,0])
+    Tcoefficients_dip.append(coefficients_dip)
+    meanV, stdV, filtered_data = exclude_outliers_percentile_mean_std(coefficients[:,0],lower_percentile=20, upper_percentile=80)
+    meanV_dip, stdV_dip, filtered_data_dip = exclude_outliers_percentile_mean_std(coefficients_dip[:,0],lower_percentile=20, upper_percentile=80)
     fmean, fstd, ffiltered_data = exclude_outliers_percentile_mean_std(farea,lower_percentile=20, upper_percentile=80)
     Tfmean.append(fmean)
     Tfstd.append(fstd)
     Tffiltered_data.append(ffiltered_data)
     Tfiltered_data.append(filtered_data)
+    Tfiltered_data_dip.append(filtered_data_dip)
     TmeanV.append(meanV)
     TstdV.append(stdV)
+    TmeanV_dip.append(meanV_dip)
+    TstdV_dip.append(stdV_dip)
     OTarea.append(Oarea)
     Tarea.append(area)
     TstdA.append(AstdV)
@@ -353,14 +351,14 @@ totaldataA = np.array([array[:, 0].T for array in Tcoefficients]).T
 X =Xdata+0.8
 TmeanV=np.array(TmeanV)
 TstdV=np.array(TstdV)
-double_array=np.array(double_array)
-
-for i in range(60):
-    plt.clf()
-    plt.rcParams.update({'font.size': 34})
-    plt.plot(X, predicted_result[i,:,:].squeeze().numpy()-np.min(predicted_result[i,:,:].squeeze().numpy()), label='Predicted absorption')
-    plt.plot(X, inputdata[i,:,:].squeeze().numpy(), label='Real Absorption')
-    plt.legend(fontsize=15)
-    plt.show()
-    plt.pause(0.2) 
-#286:446
+TmeanV_dip=np.array(TmeanV_dip)
+TstdV_dip=np.array(TstdV_dip)
+isotope_ratios=np.array(isotope_ratios)
+print(f"Lithium Isotope Abundance{isotope_ratios}")
+print(f"Standard Daviation of Center Wavelength{TstdV}")
+print(f"Center Average Wavelength{TmeanV}")
+np.savetxt("Lithium Isotope Abundance.txt",isotope_ratios, delimiter='\t', fmt='%f')
+np.savetxt( "Standard Daviation of Center Wavelength.txt",TstdV, delimiter='\t', fmt='%.20f')
+np.savetxt( "Center Average Wavelength.txt",TmeanV, delimiter='\t', fmt='%.20f')
+np.savetxt( "Standard Daviation of Center Wavelength form Absorption.txt",TstdV_dip, delimiter='\t', fmt='%.20f')
+np.savetxt( "Center Average Wavelength form Absorption.txt",TmeanV_dip, delimiter='\t', fmt='%.20f')
