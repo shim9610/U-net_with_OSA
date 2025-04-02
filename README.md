@@ -30,15 +30,6 @@ pip install -r requirements.txt
 If GPU support is needed, ensure CUDA-compatible PyTorch is installed.
 
 ## Usage
-
-### Data Analysis
-
-Reproduce the spectroscopic data analysis:
-
-```bash
-python datarun_for_isotope.py
-```
-
 ### Model Evaluation
 
 After decompressing and combining the model weights into the `weights/` directory, evaluate model performance using:
@@ -48,6 +39,14 @@ python test_model.py
 ```
 
 Ensure the model weights (`*.pth`) are correctly merged before evaluation.
+
+### Data Analysis
+
+Reproduce the spectroscopic data analysis:
+
+```bash
+python datarun_for_isotope.py
+```
 
 ## Notes on Resources
 
