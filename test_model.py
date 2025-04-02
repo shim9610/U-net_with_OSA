@@ -6,7 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 
 import matplotlib.pyplot as plt
 
-# 임의의 데이터 1개 생성 함수
 def custom_MSE(output, target,epsilon=1e-10,max_value=1e10):
         # 비율적인 차이를 계산
     ratio_diff = (target - output) / (target + epsilon)
@@ -19,7 +18,6 @@ def custom_MSE(output, target,epsilon=1e-10,max_value=1e10):
     #print(loss)
     return loss
 
-# 모델 로드
 model = SpectrumModel()
 model.eval()
 weights = torch.load('logUnet_best_model_3333k_liquid512_n_weights_only.pth',

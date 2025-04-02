@@ -14,25 +14,14 @@ from scipy import signal
 torch.serialization.add_safe_globals([SpectrumModel])
 def resampleF(data, num_samples):
     """
-    데이터의 왜곡 없이 원하는 개수로 균등하게 리샘플링하는 함수.
-    
-    Parameters:
-    data (np.ndarray): 리샘플링할 데이터 (1차원 배열).
-    num_samples (int): 리샘플링 후 데이터의 샘플 수.
-
-    Returns:
-    np.ndarray: 리샘플링된 데이터 (1차원 배열).
+    Resize the input data
     """
-    # 원본 데이터의 인덱스 범위를 생성
     original_indices = np.arange(len(data))
 
-    # 리샘플링된 인덱스 범위를 생성 (균등 간격)
     resampled_indices = np.linspace(0, len(data) - 1, num_samples)
 
-    # 1차원 선형 보간기를 생성
     interpolator = interpolate.interp1d(original_indices, data, kind='linear')
 
-    # 새로운 인덱스에 맞춰 데이터를 리샘플링
     resampled_data = interpolator(resampled_indices)
     
     return resampled_data
@@ -62,50 +51,46 @@ def voigt_fit(x,y, boundsd=([669.8, 0, 0,0], [670.1, 100, 100,80000])):
 
 
 def get_double_and_string_arrays_from_asc_files(folder_path):
-    # double 값을 저장할 빈 리스트 초기화
+
     double_array = []
-    # 파일명을 저장할 빈 리스트 초기화
+
     string_array = []
 
-    # 숫자 부분을 추출하기 위한 정규 표현식 패턴
+
     pattern = re.compile(r'(\d+)\.asc$')
 
-    # 폴더 내의 모든 파일에 대해 반복
+
     for filename in os.listdir(folder_path):
-        # 파일명이 .asc로 끝나는지 확인
+
         if filename.endswith('.asc'):
-            # 파일명에서 숫자 부분 추출
+
             match = pattern.search(filename)
             if match:
-                # 숫자 부분을 double(float) 타입으로 변환하여 배열에 추가
+
                 double_array.append(float(match.group(1)))
-                # 확장자를 제외한 파일명을 문자열 배열에 추가
-                string_array.append(filename[:-4])  # 확장자를 제외한 파일명 추가
-                
-    # double_array와 string_array를 함께 정렬
+
+                string_array.append(filename[:-4])  # 
+
     sorted_pairs = sorted(zip(double_array, string_array))
     double_array, string_array = zip(*sorted_pairs)
-    
-    # 튜플을 리스트로 변환
+
     double_array = list(double_array)
     string_array = list(string_array)
 
     return double_array, string_array
 def load_asc_file_to_numpy(folder_path, file_number):
-    # 파일 경로 생성
+
     file_path = os.path.join(folder_path, f"{str(file_number)}.asc")
     
     try:
-        # 파일 열기
+
         with open(file_path, 'r') as file:
             lines = file.readlines()
             
-            # 문자열이 포함된 라인이 있는지 확인
             for line in lines:
                 if not re.match(r'^[\d\s\.\-eE]+$', line):
                     raise ValueError(f"File {file_path} contains non-numeric data.")
-            
-            # 파일을 넘파이 배열로 변환
+
             data = np.loadtxt(file_path)
             
             return data
@@ -139,33 +124,31 @@ def get_fitvlaue(Xdata,inputdata,len=100):
     return np.array(coefficients)
 def exclude_outliers_percentile_mean_std(data, lower_percentile=20, upper_percentile=80):
     """
-    주어진 1차원 배열에서 입력된 하위 및 상위 백분위수를 기준으로 이상치를 제외한 평균과 표준 편차를 반환하는 함수
-
-    Args:
-    data (numpy array): 1차원 배열 데이터
-    lower_percentile (float): 하위 백분위수 (기본값 25)
-    upper_percentile (float): 상위 백분위수 (기본값 75)
-
-    Returns:
-    mean (float): 이상치를 제외한 평균값
-    std (float): 이상치를 제외한 표준 편차
+    Exclude outliers based on a modified percentile-based IQR method.
+    
+    Procedure:
+    1. Compute lower and upper percentiles instead of standard quartiles (25% and 75%).
+    2. Define the inter-percentile range (IQR) based on these percentiles.
+    3. Exclude data outside the extended bounds (1.5 × IQR) to remove extreme outliers.
+    4. Calculate mean and standard deviation from the filtered data.
+    
+    This approach is chosen to robustly estimate mean and standard deviation
+    by reducing sensitivity to extreme values in skewed or noisy data.
     """
     
-    # 하위 백분위수(Q1)와 상위 백분위수(Q3) 계산
     Q1 = np.percentile(data, lower_percentile)
     Q3 = np.percentile(data, upper_percentile)
     
-    # IQR 계산
     IQR = Q3 - Q1
     
-    # 이상치 기준 설정 (1.5 * IQR을 벗어난 값은 이상치로 간주)
+
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     
-    # 이상치를 제외한 데이터 필터링
+
     filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
     
-    # 평균과 표준 편차 계산
+
     mean_value = np.mean(filtered_data)
     std_value = np.std(filtered_data)
     
@@ -177,9 +160,6 @@ def get_area(Xdata,inputdata,length=100,mode="wavelength"):
     elif mode == "frequency":
         c=299792458
         x_inte=c/x_interp
-        
-        
-        
     area=np.zeros([length])
     maxV=np.zeros([length])
     for i in range(length):  
@@ -235,13 +215,6 @@ def smothNerr(inputdata, index=range(0,100), length=101,
         x_interp = np.linspace(668.0, 672.6, 30000)
         y_interp = np.interp(x_interp, Xdata, input_data)
         y_interp = np.clip(y_interp, a_min=0, a_max=None)
-        '''
-        plt.clf()
-        plt.plot(Xdata,input_data)
-        plt.plot(x_interp,y_interp)
-        plt.show()
-        plt.pause(0.2) 
-        '''
         c=299792458
         x_inte=c/x_interp
         maxV[j] = np.max(input_data)

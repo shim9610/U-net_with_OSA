@@ -12,47 +12,10 @@ import torch.nn.functional as F
 from scipy.signal import savgol_filter
 import torch.distributions as dist 
 
-class SUDOVoigtLayer(nn.Module):
-    def __init__(self):
-        super(SUDOVoigtLayer, self).__init__()
-
-    def forward(self, x, size):
-        # FC 레이어의 출력 x는 [배치 크기, 3] 형태라고 가정합니다.
-        # 이 x를 mu, gamma, sigma로 분리합니다.
-        mu, gamma, sigma, amp = x[:, 0], x[:, 1], x[:, 2], x[:, 3]
-        # gamma가 너무 작지 않도록 epsilon 값을 더해줍니다.
-        epsilon = 1e-5
-        gamma = torch.clamp(gamma, min=epsilon)
-        sigma = torch.clamp(sigma, min=epsilon)
-        gamma=gamma*size
-        sigma=sigma*size
-        mu=mu*size
-        # x를 0에서 size까지의 값으로 생성하고, 배치 크기에 맞게 확장합니다.
-        linspace_x = torch.linspace(0, size, steps=size).unsqueeze(0).unsqueeze(1)  # linspace_x.shape = [1, 1, size]
-        linspace_x = linspace_x.expand(mu.size(0), 1, size).to(x.device)   # linspace_x.shape = [배치 크기, 1, size]
-
-        # mu, gamma, sigma를 확장하여 [배치 크기, 1, 1] 형태로 만듭니다.
-        mu = mu.unsqueeze(1).unsqueeze(2)  # mu.shape = [배치 크기, 1, 1]
-        gamma = gamma.unsqueeze(1).unsqueeze(2)  # gamma.shape = [배치 크기, 1, 1]
-        sigma = sigma.unsqueeze(1).unsqueeze(2)  # sigma.shape = [배치 크기, 1, 1]
-        amp = amp.unsqueeze(1).unsqueeze(2)  # sigma.shape = [배치 크기, 1, 1]
-
-        # 가우시안과 로렌치안 분포 정의
-        gauss = dist.Normal(mu, sigma)
-        lorentz = dist.Cauchy(mu, gamma)
-
-        # Voigt 프로파일 계산 (가우시안과 로렌치안의 곱)
-        voigt = gauss.log_prob(linspace_x).exp() * lorentz.log_prob(linspace_x).exp()*amp
-        #print("Voigt shape:", voigt.shape)  # 중간 결과 출력
-        #print("NaN count:", torch.isnan(voigt).sum().item())  # NaN 확인
-        # voigt.shape = [배치 크기, 1, size]
-
-        return voigt
-    
+######################################################    
 class ExpActivation(nn.Module):
     def __init__(self):
         super(ExpActivation, self).__init__()
-    
     def forward(self, x):
         return torch.exp(x)  # 지수 활성화 함수
 
@@ -61,17 +24,14 @@ class HalfExpActivation(nn.Module):
         super(HalfExpActivation, self).__init__()
         self.exp_activation = ExpActivation()
         self.relu_activation = nn.ReLU(inplace=True)
-    
     def forward(self, x):
         # 텐서를 채널 축으로 반 나누기
         split = x.size(1) // 2
         x1 = x[:, :split, :]
         x2 = x[:, split:, :]
-
         # 절반은 지수 활성화, 절반은 ReLU 활성화
         x1 = self.exp_activation(x1)
         x2 = self.relu_activation(x2)
-
         # 다시 합치기
         return torch.cat((x1, x2), dim=1)
 class LogActivation(nn.Module):
@@ -79,37 +39,32 @@ class LogActivation(nn.Module):
         super(LogActivation, self).__init__()
     
     def forward(self, x):
-        return torch.log(x + 1e-6)  # 로그 활성화 함수 (음수 처리 X, 입력이 이미 ReLU 통과)
+        return torch.log(x + 1e-6)  
 class HalfLogActivation(nn.Module):
     def __init__(self):
         super(HalfLogActivation, self).__init__()
         self.log_activation = LogActivation()
         self.relu_activation = nn.ReLU(inplace=True)
-    
     def forward(self, x):
-        # 전체 입력에 ReLU 적용
         x = self.relu_activation(x)
-        
-        # 텐서를 채널 축으로 반 나누기
         split = x.size(1) // 2
         x1 = x[:, :split, :]
         x2 = x[:, split:, :]
-
-        # 절반은 로그 활성화
         x1 = self.log_activation(x1)
-
-        # 다시 합치기
         return torch.cat((x1, x2), dim=1)
+###############################################################
+# The following custom activation functions (ExpActivation, HalfExpActivation, LogActivation, HalfLogActivation)
+# were tested experimentally but did not improve model performance. Thus, these are not used in the final model.
+# Included here for reference purposes only.
+################################################################
+    
+    
 def min_max_normalize(tensor, min_val=0.0, max_val=1.0):
-    # 각 배치와 채널에 대해 최소 및 최대 값을 계산
     tensor_min = tensor.min(dim=-1, keepdim=True).values
     tensor_max = tensor.max(dim=-1, keepdim=True).values
     normalized_tensor = (tensor - tensor_min) / (tensor_max - tensor_min + 1e-10)
     normalized_tensor = normalized_tensor * (max_val - min_val) + min_val
-    
-    # factor 텐서 생성 (batch_size, 2, channels)
     factor = torch.cat([tensor_min, (tensor_max - tensor_min + 1e-10)], dim=-1)
-    
     return normalized_tensor, factor
 class SpectrumModel(nn.Module):
     def __init__(self,in_channels=1, base_channels=512):
@@ -175,16 +130,8 @@ class SpectrumModel(nn.Module):
         )
         return block
     def forward(self, x,mode='train'):
-        # 인코더 경로
         input_size = x.shape[-1]
         x, factor = min_max_normalize(x)
-        #x_np = x.cpu().numpy()  # PyTorch 텐서를 NumPy 배열로 변환
-        #sg_filtered = savgol_filter(x_np, window_length=10, polyorder=5, axis=-1)
-        #sg_filtered = torch.tensor(sg_filtered).to(x.device)  # NumPy 배열을 다시 PyTorch 텐서로 변환
-        #difference = x - sg_filtered
-        #log_transformed = torch.log1p(x)
-        #x = torch.cat([x, sg_filtered, difference, log_transformed], dim=1)
-        
         enc1 = self.encoder1(x)
         x = self.downsample(enc1)
         
@@ -198,14 +145,9 @@ class SpectrumModel(nn.Module):
         x = self.downsample(enc4)
         
         x=self.centerconv(x)
-        #voigtC=self.Voigt_Conv(x)
-        #voigtC=voigtC.view(voigtC.size(0), -1)
-        #voigtC=self.relu(self.Voigt_FC1(voigtC))
-        #voigtC=self.relu(self.Voigt_FC2(voigtC))
-        #voigtC=self.relu(self.Voigt_FC3(voigtC))
-        #voigtC=self.voigt_layer(voigtC,input_size)
+
         x=self.relu(x)
-        # 디코더 경로
+
         x = self.upsample(x)
         x = torch.cat([x, enc4], dim=1)
         x = self.decoder4(x)
@@ -215,9 +157,7 @@ class SpectrumModel(nn.Module):
         x = self.upsample(x)
         x = torch.cat([x, enc3], dim=1)
         x = self.decoder3(x)
-        
         enc3 = self.upsampletw(enc3)
-        
         x = self.upsample(x)
         x = torch.cat([x, enc2], dim=1)
         x = self.decoder2(x)
@@ -233,53 +173,48 @@ class SpectrumModel(nn.Module):
         x = self.final_conv(x)
 
         
-        if mode == 'train':
-            # 첫 번째 채널만 반환
+        if mode == 'train': #only use emission
             return x[:, 0, :]
-        elif mode == 'train_absorbance':
-            # 두 번째 채널만 반환
+        elif mode == 'train_absorbance':# use absorption
             return x[:, 1, :]
-        elif mode == 'train_dual':
-            # 두 채널 모두 반환
+        elif mode == 'train_dual':# use emission&absorption
             return x
         elif mode == 'test_dual':
-            # 두 채널 모두 반환
             x[:, 0, :]= (x[:, 0, :] * factor[:, :, 1]) + factor[:, :, 0]
             return x
         elif mode == 'test':
-            # 첫 번째 채널에 대해 후처리 후 반환
             x = (x[:, 0, :].unsqueeze(1) * factor[:, :, 1].unsqueeze(1)) + factor[:, :, 0].unsqueeze(1)
             return x
         else:
             return 'Mode Name Error, Please Try "train", "test", "train_absorbance", or "train_dual"'
 
 def generate_random_parameters():
-    # 랜덤 파라미터 생성
-    intensity = random.uniform(100, 50000)  # intensity 범위: 100 ~ 100000
-    isotope = random.uniform(0, 100)         # isotope 범위: 0 ~ 100
-    absorbance = random.uniform(0, 4.5)        # absorbance 범위: 0 ~ 3
-    temperature = VC.Temperature(random.uniform(300, 10000), 'K')  # Tg: 300K ~ 10000K
-    LH = random.uniform(10, 100)              # LH 범위: 10 ~ 50
-    LC = random.uniform(0,20)               # LC 범위: 0 ~ 20
-    PressureB = 0                            # PressureB는 항상 0
-    shiftdiff = random.uniform(0, 0.003)     # shiftdiff 범위: 0 ~ 0.003
-    noiselevel = random.uniform(10, 1000)     # noiselevel 범위: 0 ~ 1000
+    # Random Parameter set function
+    intensity = random.uniform(100, 50000)  
+    isotope = random.uniform(0, 100)        
+    absorbance = random.uniform(0, 4.5)     
+    temperature = VC.Temperature(random.uniform(300, 10000), 'K')  
+    LH = random.uniform(10, 100)              
+    LC = random.uniform(0,20)               
+    PressureB = 0                            
+    shiftdiff = random.uniform(0, 0.003)     
+    noiselevel = random.uniform(10, 1000)     
     X_shift = random.uniform(0.8, 0.87)
     #X_extend=random.uniform(0, 2.5)
     X_extend=2
     return intensity, isotope, absorbance, temperature, LH, LC, PressureB, shiftdiff, noiselevel,X_shift,X_extend
 
 def set_parm(isotope=None, absorbance=None):
-    # 랜덤 파라미터 생성
-    intensity = 11000  # intensity 범위: 100 ~ 100000
+    #Custom Pram generation
+    intensity = 11000  
     isotope = isotope if isotope is not None else random.uniform(0, 100)
     absorbance = absorbance if absorbance is not None else random.uniform(0, 4.5)
-    temperature = VC.Temperature(3000, 'K')  # Tg: 300K ~ 10000K
-    LH = 40              # LH 범위: 10 ~ 50
-    LC = 10               # LC 범위: 0 ~ 20
-    PressureB = 0                            # PressureB는 항상 0
-    shiftdiff = 0.002    # shiftdiff 범위: 0 ~ 0.003
-    noiselevel = 50     # noiselevel 범위: 0 ~ 1000
+    temperature = VC.Temperature(3000, 'K')  
+    LH = 40             
+    LC = 10              
+    PressureB = 0                           
+    shiftdiff = 0.002   
+    noiselevel = 50     
     X_shift = 0.85
     #X_extend=random.uniform(0, 2.5)
     X_extend=0.35
@@ -292,7 +227,7 @@ def create_spectrum(solution_type='absorbance', parm="rand",isotope_in=None, abs
     elif parm =="test":
         intensity, isotope, absorbance, Tg, LH, LC, PressureB, shiftdiff, noiselevel,X_shift,X_extend = set_parm(isotope_in, absorbance_in)
     # 모델 객체 생성
-    spectrum_model = VC.Lithium_isotope_Object_model3(intensity=intensity,
+    spectrum_model = VC.Lithium_isotope_Object_model_main(intensity=intensity,
                                                       isotope=isotope,
                                                       absorbance=absorbance,
                                                       Tg=Tg,
@@ -300,10 +235,10 @@ def create_spectrum(solution_type='absorbance', parm="rand",isotope_in=None, abs
                                                       LC=LC,
                                                       PressureB=PressureB,
                                                       shiftdiff=shiftdiff)
-        # X축 데이터 생성
-    X = np.linspace( 669.46-X_extend, 670.544+X_extend, 160)+X_shift #667~673
-    X2= np.linspace(669.46-X_extend, 670.544+X_extend, 160)+X_shift
-    # 스펙트럼 데이터 생성
+        # X axsis 
+    X = np.linspace( 669.46-X_extend, 670.544+X_extend, 160)+X_shift #
+    X2= np.linspace(669.46-X_extend, 670.544+X_extend, 160)+X_shift # for super upsampling
+    # generate spectrum
     Y = spectrum_model.get_intensity(X)
     noise_adder = VC.SpectralNoiseAdder(Y.copy(), add_poisson_noise=True,
                                     add_gaussian_noise=True, gaussian_noise_level=noiselevel, poisson_noise_level=1)
@@ -320,18 +255,15 @@ def create_spectrum(solution_type='absorbance', parm="rand",isotope_in=None, abs
     elif solution_type=='origin':
         Y2 = Y.copy()
     elif solution_type == 'dual':
-        # dual인 경우 emission_normalized와 absorbance 두 채널을 반환
         Y_emission_normalized = spectrum_model.get_emmision_intensity(X2) / factor[1].numpy()
         Y_absorbance = spectrum_model.get_absorbance(X2)
         Y2 = np.stack([Y_emission_normalized, Y_absorbance], axis=0)
     elif solution_type == 'dual_test':
-        # dual인 경우 emission_normalized와 absorbance 두 채널을 반환
         Y_emission = spectrum_model.get_emmision_intensity(X2)
         Y_absorbance = spectrum_model.get_absorbance(X2)
         Y2 = np.stack([Y_emission, Y_absorbance], axis=0)
-    # 노이즈 추가
     check=[isotope , absorbance]
-    # 시각화
+    # debug plot
     #plt.figure(figsize=(10, 6))
     #plt.plot(X2, Y2, label='Target Spectrum')
     #plt.plot(X, Y_noisy, label='Noisy Spectrum', linestyle='--')
@@ -341,7 +273,6 @@ def create_spectrum(solution_type='absorbance', parm="rand",isotope_in=None, abs
     #plt.legend()
     #plt.show()
     return Y_noisy, Y2, check
-# 데이터셋 클래스 정의
 class SpectrumDataset(Dataset):
     def __init__(self,data):
 
@@ -356,7 +287,6 @@ class SpectrumDataset(Dataset):
             return torch.tensor(Y_noisy, dtype=torch.float32).unsqueeze(0), torch.tensor(Y2, dtype=torch.float32).unsqueeze(0)
         else:
             return torch.tensor(Y_noisy, dtype=torch.float32).unsqueeze(0), torch.tensor(Y2, dtype=torch.float32)
-
 def get_model_size(model):
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

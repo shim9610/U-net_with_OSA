@@ -419,7 +419,7 @@ class Lithium_isotope_Object_model2:
         spectrum = self.get_intensity(X)
         broadened_spectrum = self.apply_gaussian_broadening(X, spectrum)
         return broadened_spectrum
-class Lithium_isotope_Object_model3:
+class Lithium_isotope_Object_model_main:
     def __init__(self,intensity=1,isotope=7.5,absorbance=2.5,Tg=Temperature(300,'K'),LH=0,LC=0 ,PressureB=0, shiftdiff=0,instrumental_broadening=0):
         if ~isinstance(Tg,Temperature):
             TgC=Temperature(Tg,'K')
@@ -520,3 +520,12 @@ class Lithium_isotope_Object_preFit:
         return emmision
     def print_shift(self):
         print(f'emissiton :{self.L7D1.stark.stark_shift}')
+        
+        
+if __name__ == "__main__":
+    T=Temperature(300)
+    print(T.calGHz(670))
+    T=Temperature(1000)
+    print(T.calGHz(670))
+    T=Temperature(10000)
+    print(T.calGHz(670))
