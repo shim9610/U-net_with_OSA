@@ -78,7 +78,7 @@ Ensure that the weights (`*.pth`) are properly combined after decompression for 
 
 For detailed methodologies, results, and discussions, please refer to our paper available at:
 
-- [Preprint on SSRN](https://doi.org/10.1016/j.rinp.2025.108373)
+- [SHIM, Sungyong, et al. Self-absorption correction in LIBS-based lithium isotope analysis with a modified 1D U-Net. Results in Physics, 2025, 108373.](https://doi.org/10.1016/j.rinp.2025.108373)
 
 ## License
 
