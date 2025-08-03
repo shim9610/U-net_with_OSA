@@ -78,7 +78,7 @@ Ensure that the weights (`*.pth`) are properly combined after decompression for 
 
 For detailed methodologies, results, and discussions, please refer to our paper available at:
 
-- [Preprint on SSRN](https://ssrn.com/abstract=5128894)
+- [Preprint on SSRN](https://doi.org/10.1016/j.rinp.2025.108373)
 
 ## License
 
